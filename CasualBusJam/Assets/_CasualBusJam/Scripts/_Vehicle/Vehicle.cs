@@ -265,6 +265,16 @@ namespace _CasualBusJam.Scripts._Vehicle
                     });
                 }
             }
+
+            if (other.gameObject.CompareTag("Border") && !_isCollided)
+            {
+                _isCollided = true;
+                IsMovingStraight = false;
+                _canCollideWithOtherVehicle = false;
+                MoveToTargetFromBorder();
+                // REMOVE VEHICLE
+                movingZdir.Pause();
+            }
         }
 
         public void MoveToSideBorder(Transform collider, float distance)

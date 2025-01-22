@@ -1,0 +1,309 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using _CasualBusJam.Scripts._Enum;
+using DG.Tweening;
+using Unity.VisualScripting;
+using UnityEngine;
+using UnityEngine.EventSystems;
+
+namespace _CasualBusJam.Scripts._Vehicle
+{
+    public class Vehicle : MonoBehaviour
+    {
+        [Header("------- Vehicle Elements -------")]
+        public ColorEnum vehicleColor;
+        public List<Transform> seats;
+        public List<MeshRenderer> vehMesh;
+        public List<GameObject> removableParts;
+
+
+        [Header("----- Vehicle Settings ------")]
+        public Tween movingZdir;
+        public bool isFull = false;
+        public Vector3 originalPosition;
+        public Vector3 originalScale;
+        public Vector3 newScale;
+        public int playersInSeat = 0;
+        public static bool IsMovingStraight = false;
+        public static ColorEnum LastTouchedCarColor;
+        public bool isMovingForward = false;
+        public int SeatCount => seats.Count;
+        
+        private float _distance = 30f;
+        private bool _isCollided = false;
+        private ParkingSlots _slot;
+        private bool _canCollideWithOtherVehicle = true;
+        private bool _toggle;
+        private static int _counter = 0;
+
+
+        private void Start()
+        {
+            SetInitialPosition();
+            originalScale = transform.localScale;
+            IsMovingStraight = false;
+            Vector3 currentRotation = transform.rotation.eulerAngles;
+            transform.rotation = Quaternion.Euler(0, currentRotation.y, 0);
+        }
+
+        private void OnValidate()
+        {
+            Vector3 currentRotation = transform.rotation.eulerAngles;
+            transform.rotation = Quaternion.Euler(0, currentRotation.y, 0);
+        }
+
+        private void OnMouseDown()
+        {
+            if (IsMovingStraight || EventSystem.current.IsPointerOverGameObject())
+                return;
+            
+            LastTouchedCarColor = vehicleColor;
+            
+            if (CheckForVehicleInFront(out RaycastHit hitInfo))
+            {
+                IsMovingStraight = true;
+                isMovingForward = true;
+                
+                Vector3 targetPosition =
+                    transform.position + transform.forward * (hitInfo.distance + 1);
+                movingZdir = transform.DOMove(targetPosition, 0.2f).SetEase(Ease.InQuad);
+                
+                return;
+            }
+
+            _slot = ParkingManager.Instance.CheckForFreeSlot();
+            if (!_slot)
+            {
+                Debug.Log("No Free Slot");
+                return;
+            }
+
+            MoveCarStraight();
+        }
+
+        private void SetInitialPosition()
+        {
+            originalPosition = transform.position;
+        }
+
+        private bool CheckForVehicleInFront(out RaycastHit hitInfo)
+        {
+            Vector3 forward = transform.TransformDirection(Vector3.forward);
+            float rayDistance = Mathf.Infinity;
+
+            if (Physics.Raycast(transform.position, forward, out hitInfo, rayDistance))
+            {
+                if (hitInfo.collider.TryGetComponent(out Vehicle vehicle) && vehicle._canCollideWithOtherVehicle && !vehicle.isMovingForward)
+                {
+                    Debug.Log("Vehicle is in front");
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public void MoveCarStraight()
+        {
+            _slot.isOccupied = true;
+            IsMovingStraight = true;
+            isMovingForward = true;
+            
+            Vector3 localPosition = transform.localPosition;
+            Vector3 localForwardDirection = transform.localRotation * Vector3.forward;
+            Vector3 pointAtDistance = localPosition + localForwardDirection * _distance;
+            Vector3 worldPoint = transform.parent.TransformPoint(pointAtDistance);
+            
+            Debug.DrawLine(transform.position, worldPoint, Color.green);
+            movingZdir = transform.DOMove(worldPoint, 12f).SetSpeedBased();
+            //GetComponent<AudioSource>().enabled = true;
+        }
+
+        private void ChangeScale(bool shift)
+        {
+            newScale = Vector3.one;
+            if (shift)
+                transform.localScale = newScale;
+            else
+                transform.localScale = originalScale;
+        }
+
+        public Transform GetFreeSeat()
+        {
+            for (int i = 0; i < seats.Count; i++)
+            {
+                if (seats[i].childCount == 0)
+                {
+                    playersInSeat++;
+                    IsVehicleFull();
+                    return seats[i];
+                }
+            }
+
+            return null;
+        }
+
+        private void IsVehicleFull()
+        {
+            if (playersInSeat == seats.Count)
+            {
+                isFull = true;
+                DOVirtual.DelayedCall(1f, () =>
+                {
+                    VehicleGoingExit();
+                    //CheckGameWin();
+                });
+            }
+        }
+
+        private void VehicleGoingExit()
+        {
+            VehicleController.Instance.vehicles = VehicleController.Instance.vehicles
+                .Where(vehicle => vehicle != this.transform)
+                .ToArray();
+
+            transform.DORotateQuaternion(ParkingManager.Instance.exitPoint.rotation, 0.2f);
+            transform.DOMove(
+                new Vector3(_slot.enterPoint.transform.position.x, transform.position.y,
+                    _slot.enterPoint.transform.position.z), 30f).SetSpeedBased().OnComplete(() =>
+            {
+                _slot.isOccupied = false;
+                _canCollideWithOtherVehicle = false;
+                ParkingManager.Instance.parkedVehicles.Remove(this);
+                transform.parent = null;
+                transform.DOMove(ParkingManager.Instance.exitPoint.transform.position, 35f)
+                    .SetSpeedBased()
+                    .SetEase(Ease.InBack)
+                    .OnComplete(() => { transform.gameObject.SetActive(false); });
+            });
+            // SOUNDS
+        }
+
+        public void ChangeColor(ColorEnum colorEnum)
+        {
+            vehicleColor = colorEnum;
+            Material material = VehicleController.Instance.vehicleMaterialHolder.FindMaterialByName(colorEnum);
+            if (material)
+            {
+                for (int i = 0; i < vehMesh.Count; i++)
+                {
+                    vehMesh[i].material = material;
+                }
+            }
+        }
+
+        public bool CheckForObstacles()
+        {
+            float offset = 1.0f;
+            float rayDistance = Mathf.Infinity;
+            
+            Vector3 forward = transform.TransformDirection(Vector3.forward);
+            
+            Vector3 leftRayDirection = transform.TransformDirection(Vector3.forward + Vector3.left * offset);
+            Vector3 rightRayDirection = transform.TransformDirection(Vector3.forward + Vector3.right * offset);
+
+            if (Physics.Raycast(transform.position, leftRayDirection, out RaycastHit leftHit, rayDistance) &&
+                (Physics.Raycast(transform.position, rightRayDirection, out RaycastHit rightHit, rayDistance)))
+            {
+                if (leftHit.collider && leftHit.collider.TryGetComponent(out Vehicle vehicleLeft) &&
+                    vehicleLeft._canCollideWithOtherVehicle && !vehicleLeft.isMovingForward)
+                {
+                    Debug.Log("Vehicle detected on the left!");
+                    return true;
+                }
+                
+                if (rightHit.collider && rightHit.collider.TryGetComponent(out Vehicle vehicleRight) &&
+                    vehicleRight._canCollideWithOtherVehicle && !vehicleRight.isMovingForward)
+                {
+                    Debug.Log("Vehicle detected on the right!");
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private void ShakeVehicle() => transform.DOShakeRotation(0.2f, transform.forward * 2, vibrato: 10, randomness: 90).SetEase(Ease.InBounce);
+
+        private void OnTriggerEnter(Collider other)
+        {
+            if (other.gameObject.CompareTag("Down"))
+            {
+                _canCollideWithOtherVehicle = false;
+                movingZdir.Pause();
+                Debug.Log("Vehicle entered!");
+                _toggle = !_toggle;
+                MoveToSideBorder(VehicleController.Instance.leftCollider,-20f);
+                
+                return;
+            }
+
+            if (_canCollideWithOtherVehicle && other.TryGetComponent(out Vehicle vehicle) &&
+                vehicle._canCollideWithOtherVehicle)
+            {
+                if (_slot && _canCollideWithOtherVehicle)
+                    _slot.isOccupied = false;
+                
+                movingZdir.Pause();
+                if (!_isCollided)
+                {
+                    if (IsMovingStraight && _counter == 0 && isMovingForward)
+                    {
+                        _counter++;
+                        //GetComponent<AudioSource>().enabled = false;
+                        //
+                        //
+                    }
+                    
+                    vehicle.ShakeVehicle();
+                    transform.DOMove(originalPosition, 0.3f).SetEase(Ease.OutBack).OnComplete(() =>
+                    {
+                        _counter = 0;
+                        isMovingForward = false;
+                        IsMovingStraight = false;
+                    });
+                }
+            }
+        }
+
+        public void MoveToSideBorder(Transform collider, float distance)
+        {
+            IsMovingStraight = false;
+            _canCollideWithOtherVehicle = false;
+            
+            Transform cube = collider.transform;
+            Vector3 cubePos = cube.position;
+
+            Vector3 directionToCube = new Vector3(cubePos.x - transform.position.x, 0, 0);
+            Quaternion targetRotation = Quaternion.LookRotation(directionToCube, Vector3.up);
+            
+            transform.DORotateQuaternion(targetRotation, 0.1f);
+            transform.DOLocalMoveX(distance, 0.8f);
+            //VehicleController.Instance.RemoveVehicle(this);
+        }
+
+        public void MoveToTargetFromBorder()
+        {
+            Transform road = VehicleController.Instance.road;
+            Vector3 roadPos = road.position;
+
+            Vector3[] path = new Vector3[]
+            {
+                transform.position,
+                new Vector3(transform.position.x, transform.position.y, roadPos.z),
+            };
+            
+            transform.DORotate(Vector3.zero, 0.1f);
+            transform.DOPath(path, 0.3f, PathType.Linear).SetEase(Ease.Linear).OnComplete(() =>
+            {
+                transform.DOLookAt(roadPos, 0.1f);
+                // MOVETOSLOT
+                foreach (var parts in removableParts)
+                {
+                    parts.SetActive(false);
+                }
+            });
+        }
+    }
+}

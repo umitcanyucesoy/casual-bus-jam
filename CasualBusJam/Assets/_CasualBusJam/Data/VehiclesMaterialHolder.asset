@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3193e13d341646659724acadc03e48f6, type: 3}
+  m_Name: VehiclesMaterialHolder
+  m_EditorClassIdentifier: 
+  materialsList:
+  - {fileID: 2100000, guid: 8c4dfa838cf4e422ab16b720623d5711, type: 2}
+  - {fileID: 2100000, guid: 22d0651456d86400bb25c1c243e0c1ee, type: 2}
+  - {fileID: 2100000, guid: 3ce3b3b293c0e4759b1cf0c8c07e7f63, type: 2}
+  - {fileID: 2100000, guid: 1bb1f4c3314f242f8ae6a83bca9349df, type: 2}
+  - {fileID: 2100000, guid: 65e42739f95cd419bb56cd2f03cea11b, type: 2}
+  - {fileID: 2100000, guid: cdf5ab30ef35a419899249e98ae65022, type: 2}
+  - {fileID: 2100000, guid: 5eefba169d8ff48e49f31b6f1b8d7f40, type: 2}

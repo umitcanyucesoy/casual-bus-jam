@@ -104,7 +104,7 @@ namespace _CasualBusJam.Scripts._Vehicle
             return false;
         }
 
-        public void MoveCarStraight()
+        private void MoveCarStraight()
         {
             _slot.isOccupied = true;
             IsMovingStraight = true;

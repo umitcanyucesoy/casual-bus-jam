@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using _CasualBusJam.Scripts._Data;
 using _CasualBusJam.Scripts._Enum;
+using _CasualBusJam.Scripts._Vehicle;
 using DG.Tweening;
 using UnityEngine;
 
@@ -13,8 +14,7 @@ public class PlayerController : MonoBehaviour
     private static readonly int Sit = Animator.StringToHash("Sit");
     
     [Header("------- Player Elements -------")]
-    public MaterialHolder materialHolder;
-    public MeshRenderer playerMesh;
+    public Renderer playerMesh;
     public Animator playerAnimator;
     public GameObject animGo;
     public ColorEnum color;
@@ -26,7 +26,7 @@ public class PlayerController : MonoBehaviour
 
     public void ChangeColor(ColorEnum colorEnum)
     {
-        Material material = materialHolder.FindMaterialByName(colorEnum);
+        Material material = VehicleController.Instance.stickmanMaterialHolder.FindMaterialByName(colorEnum);
         playerMesh.material = material;
         gameObject.name += colorEnum.ToString();
         color = colorEnum;

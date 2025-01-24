@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using _CasualBusJam.Scripts._Enum;
+using _CasualBusJam.Scripts.VFX;
 using DG.Tweening;
 using Unity.VisualScripting;
 using UnityEngine;
@@ -36,8 +37,7 @@ namespace _CasualBusJam.Scripts._Vehicle
         private bool _canCollideWithOtherVehicle = true;
         private bool _toggle;
         private static int _counter = 0;
-
-
+        
         private void Start()
         {
             SetInitialPosition();
@@ -122,7 +122,7 @@ namespace _CasualBusJam.Scripts._Vehicle
 
         private void ChangeScale(bool shift)
         {
-            newScale = Vector3.one;
+            newScale = new Vector3(1f, 1f, 1f);
             if (shift)
                 transform.localScale = newScale;
             else
@@ -149,11 +149,11 @@ namespace _CasualBusJam.Scripts._Vehicle
             if (playersInSeat == seats.Count)
             {
                 isFull = true;
-                DOVirtual.DelayedCall(1f, () =>
-                {
-                    VehicleGoingExit();
-                    //CheckGameWin();
-                });
+                 DOVirtual.DelayedCall(1f, () =>
+                      {
+                          VehicleGoingExit();
+                          //CheckGameWin();
+                     });
             }
         }
 
@@ -253,7 +253,8 @@ namespace _CasualBusJam.Scripts._Vehicle
                         _counter++;
                         //GetComponent<AudioSource>().enabled = false;
                         //
-                        //
+                        EffectsManager.Instance.PlayEffect(EffectsManager.Instance.hitEffect,
+                            other.ClosestPoint(transform.position + new Vector3(0, 0.25f, 0)), Quaternion.identity);
                     }
                     
                     vehicle.ShakeVehicle();
@@ -275,9 +276,19 @@ namespace _CasualBusJam.Scripts._Vehicle
                 // REMOVE VEHICLE
                 movingZdir.Pause();
             }
+
+            if (other.gameObject.CompareTag("Upborder") && !_isCollided)
+            {
+                _isCollided = true;
+                IsMovingStraight = false;
+                _canCollideWithOtherVehicle = false;
+                MoveToTargetFromUpBorder();
+                //
+                movingZdir.Pause();
+            }
         }
 
-        public void MoveToSideBorder(Transform collider, float distance)
+        private void MoveToSideBorder(Transform collider, float distance)
         {
             IsMovingStraight = false;
             _canCollideWithOtherVehicle = false;
@@ -293,7 +304,7 @@ namespace _CasualBusJam.Scripts._Vehicle
             //VehicleController.Instance.RemoveVehicle(this);
         }
 
-        public void MoveToTargetFromBorder()
+        private void MoveToTargetFromBorder()
         {
             Transform road = VehicleController.Instance.road;
             Vector3 roadPos = road.position;
@@ -307,13 +318,51 @@ namespace _CasualBusJam.Scripts._Vehicle
             transform.DORotate(Vector3.zero, 0.1f);
             transform.DOPath(path, 0.3f, PathType.Linear).SetEase(Ease.Linear).OnComplete(() =>
             {
-                transform.DOLookAt(roadPos, 0.1f);
-                // MOVETOSLOT
+                transform.DOLookAt(roadPos, 0.2f);
+                MoveToSlot();
                 foreach (var parts in removableParts)
                 {
                     parts.SetActive(false);
                 }
             });
+        }
+
+        private void MoveToTargetFromUpBorder()
+        {
+            transform.DOLookAt(_slot.transform.position, 0.2f);
+            MoveToSlot();
+            foreach (var parts in removableParts)
+            {
+                parts.SetActive(false);
+            }
+        }
+
+        private void MoveToSlot()
+        {
+            Vector3[] waypoints = new Vector3[]
+            {
+                new(_slot.enterPoint.position.x, transform.position.y, _slot.enterPoint.position.z),
+                new(_slot.stopPoint.position.x, transform.position.y + .5f, _slot.stopPoint.position.z),
+            };
+
+            ChangeScale(true);
+
+            transform.DOPath(waypoints, .5f, PathType.CatmullRom).OnWaypointChange(waypointindex =>
+            {
+                if (waypointindex == 1)
+                {
+                    transform.DORotateQuaternion(_slot.stopPoint.rotation, 0.2f);
+                }
+            }).OnComplete(() =>
+            {
+                IsMovingStraight = false;
+                ParkingManager.Instance.parkedVehicles.Add(this);
+                transform.parent = _slot.transform;
+                GetComponent<BoxCollider>().enabled = false;
+                Debug.Log("Moved to Slot");
+                //
+            });
+
         }
     }
 }

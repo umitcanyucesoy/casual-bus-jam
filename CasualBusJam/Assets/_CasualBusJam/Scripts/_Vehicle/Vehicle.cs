@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using _CasualBusJam.Scripts._Enum;
+using _CasualBusJam.Scripts._Events;
+using _CasualBusJam.Scripts._Player;
 using _CasualBusJam.Scripts.VFX;
 using DG.Tweening;
 using Unity.VisualScripting;
@@ -128,58 +130,7 @@ namespace _CasualBusJam.Scripts._Vehicle
             else
                 transform.localScale = originalScale;
         }
-
-        public Transform GetFreeSeat()
-        {
-            for (int i = 0; i < seats.Count; i++)
-            {
-                if (seats[i].childCount == 0)
-                {
-                    playersInSeat++;
-                    IsVehicleFull();
-                    return seats[i];
-                }
-            }
-
-            return null;
-        }
-
-        private void IsVehicleFull()
-        {
-            if (playersInSeat == seats.Count)
-            {
-                isFull = true;
-                 DOVirtual.DelayedCall(1f, () =>
-                      {
-                          VehicleGoingExit();
-                          //CheckGameWin();
-                     });
-            }
-        }
-
-        private void VehicleGoingExit()
-        {
-            VehicleController.Instance.vehicles = VehicleController.Instance.vehicles
-                .Where(vehicle => vehicle != this.transform)
-                .ToArray();
-
-            transform.DORotateQuaternion(ParkingManager.Instance.exitPoint.rotation, 0.2f);
-            transform.DOMove(
-                new Vector3(_slot.enterPoint.transform.position.x, transform.position.y,
-                    _slot.enterPoint.transform.position.z), 30f).SetSpeedBased().OnComplete(() =>
-            {
-                _slot.isOccupied = false;
-                _canCollideWithOtherVehicle = false;
-                ParkingManager.Instance.parkedVehicles.Remove(this);
-                transform.parent = null;
-                transform.DOMove(ParkingManager.Instance.exitPoint.transform.position, 35f)
-                    .SetSpeedBased()
-                    .SetEase(Ease.InBack)
-                    .OnComplete(() => { transform.gameObject.SetActive(false); });
-            });
-            // SOUNDS
-        }
-
+        
         public void ChangeColor(ColorEnum colorEnum)
         {
             vehicleColor = colorEnum;
@@ -191,37 +142,6 @@ namespace _CasualBusJam.Scripts._Vehicle
                     vehMesh[i].material = material;
                 }
             }
-        }
-
-        public bool CheckForObstacles()
-        {
-            float offset = 1.0f;
-            float rayDistance = Mathf.Infinity;
-            
-            Vector3 forward = transform.TransformDirection(Vector3.forward);
-            
-            Vector3 leftRayDirection = transform.TransformDirection(Vector3.forward + Vector3.left * offset);
-            Vector3 rightRayDirection = transform.TransformDirection(Vector3.forward + Vector3.right * offset);
-
-            if (Physics.Raycast(transform.position, leftRayDirection, out RaycastHit leftHit, rayDistance) &&
-                (Physics.Raycast(transform.position, rightRayDirection, out RaycastHit rightHit, rayDistance)))
-            {
-                if (leftHit.collider && leftHit.collider.TryGetComponent(out Vehicle vehicleLeft) &&
-                    vehicleLeft._canCollideWithOtherVehicle && !vehicleLeft.isMovingForward)
-                {
-                    Debug.Log("Vehicle detected on the left!");
-                    return true;
-                }
-                
-                if (rightHit.collider && rightHit.collider.TryGetComponent(out Vehicle vehicleRight) &&
-                    vehicleRight._canCollideWithOtherVehicle && !vehicleRight.isMovingForward)
-                {
-                    Debug.Log("Vehicle detected on the right!");
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         private void ShakeVehicle() => transform.DOShakeRotation(0.2f, transform.forward * 2, vibrato: 10, randomness: 90).SetEase(Ease.InBounce);
@@ -360,9 +280,38 @@ namespace _CasualBusJam.Scripts._Vehicle
                 transform.parent = _slot.transform;
                 GetComponent<BoxCollider>().enabled = false;
                 Debug.Log("Moved to Slot");
-                //
+                if (!PlayerController.Instance.isColorMatched)
+                    EventManager.OnNewVehArrived?.Invoke();
+                //sounds
             });
 
+        }
+
+        public Transform GetFreeSeat()
+        {
+            for (int i = 0; i < seats.Count; i++)
+            {
+                if (seats[i].childCount == 0)
+                {
+                    playersInSeat++;
+                    return seats[i];
+                }
+            }
+
+            return null;
+        }
+
+        private void IsVehicleFull()
+        {
+            if (playersInSeat == seats.Count)
+            {
+                isFull = true;
+                DOVirtual.DelayedCall(1f, () =>
+                {
+                    //VehicleGoing();
+                    //GameManager.instance.CheckGameWin();
+                });
+            }
         }
     }
 }

@@ -2,7 +2,9 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using _CasualBusJam.Scripts._Events;
 using _CasualBusJam.Scripts._Vehicle;
+using DG.Tweening;
 using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.Serialization;
@@ -17,6 +19,7 @@ namespace _CasualBusJam.Scripts._Player
         public List<Player> playersInScene = new();
         public List<Player> totalPlayerList = new();
         public List<Player> activePlayerList = new();
+        public bool isColorMatched = false;
         
         [Header("----- PLAYER COLOR SHUFFLE -----")]
         public bool canShuffle;
@@ -36,6 +39,16 @@ namespace _CasualBusJam.Scripts._Player
         {
             Instance = this;
             GeneratePoints();
+        }
+
+        private void OnEnable()
+        {
+            EventManager.OnNewVehArrived += AnyCarColorMatched;
+        }
+
+        private void OnDisable()
+        {
+            EventManager.OnNewVehArrived -= AnyCarColorMatched;
         }
 
         public void InstantiatePlayer(Vehicle[] vehicles)
@@ -151,5 +164,53 @@ namespace _CasualBusJam.Scripts._Player
 
             return list;
         }
+
+        private void AnyCarColorMatched()
+        {
+            var cars = ParkingManager.Instance.parkedVehicles;
+            if (cars.Count <= 0) return;
+
+            foreach (var car in cars)
+            {
+                if (activePlayerList.Count > 0 && activePlayerList[0].color == car.vehicleColor && !car.isFull)
+                {
+                    isColorMatched = true;
+                    StartCoroutine(activePlayerList[0].MoveToTruck(car));
+                    return;
+                }   
+            }
+            
+            isColorMatched = false;
+            // Checkifgameover
+        }
+
+        public void RepositionPlayer()
+        {
+            activePlayerList.RemoveAt(0);
+            if (totalPlayerList.Count > 0)
+            {
+                activePlayerList.Add(totalPlayerList[0]);
+                totalPlayerList[0].gameObject.SetActive(true);
+                totalPlayerList.RemoveAt(0);
+            }
+
+            for (int i = 0; i < activePlayerList.Count; i++)
+            {
+                Player currentPlayer = activePlayerList[i];
+                currentPlayer.playerAnimator.SetBool(Player.Walk, true);
+                Vector3 startPosition = currentPlayer.transform.position;
+                Vector3 endPosition = allPoints[i];
+                
+                currentPlayer.transform.DOMove(endPosition, .1f)
+                    .OnComplete(() => currentPlayer.playerAnimator.SetBool(Player.Walk, false));
+                
+                Vector3 direction = (endPosition - startPosition).normalized;
+                Quaternion targetRotation = Quaternion.LookRotation(direction);
+                currentPlayer.transform.DORotate(targetRotation.eulerAngles, .2f);
+            }
+            
+            AnyCarColorMatched();
+        }
+        
     }
 }

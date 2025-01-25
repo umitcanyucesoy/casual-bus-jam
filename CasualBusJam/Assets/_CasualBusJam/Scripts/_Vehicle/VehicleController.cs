@@ -4,6 +4,7 @@ using System.Linq;
 using _CasualBusJam.Scripts._Data;
 using _CasualBusJam.Scripts._Enum;
 using _CasualBusJam.Scripts._Player;
+using Unity.VisualScripting;
 using UnityEngine;
 
 namespace _CasualBusJam.Scripts._Vehicle
@@ -27,6 +28,11 @@ namespace _CasualBusJam.Scripts._Vehicle
             Instance = this;
             vehicleMaterialHolder.InitializeMaterialDictionary();
             RandomVehColor();
+            
+        }
+
+        private void Start()
+        {
             CalculatePlayersCount();
         }
 

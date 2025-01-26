@@ -5,6 +5,7 @@ using _CasualBusJam.Scripts._Data;
 using _CasualBusJam.Scripts._Enum;
 using _CasualBusJam.Scripts._Player;
 using _CasualBusJam.Scripts._Vehicle;
+using _CasualBusJam.Scripts.SFX;
 using DG.Tweening;
 using UnityEngine;
 
@@ -82,9 +83,9 @@ public class Player : MonoBehaviour
         });
         
         yield return new WaitForSeconds(.1f);
-        //Updateplayercount
+        VehicleController.Instance.UpdatePlayerCount();
         PlayerController.Instance.RepositionPlayer();
-        //sound
+        SoundController.Instance.PlayOneShot(SoundController.Instance.sort);
     }
     
     

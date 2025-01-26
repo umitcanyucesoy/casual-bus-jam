@@ -4,6 +4,7 @@ using System.Linq;
 using _CasualBusJam.Scripts._Enum;
 using _CasualBusJam.Scripts._Events;
 using _CasualBusJam.Scripts._Player;
+using _CasualBusJam.Scripts.SFX;
 using _CasualBusJam.Scripts.VFX;
 using DG.Tweening;
 using Unity.VisualScripting;
@@ -108,6 +109,7 @@ namespace _CasualBusJam.Scripts._Vehicle
 
         private void MoveCarStraight()
         {
+            SoundController.Instance.PlayOneShot(SoundController.Instance.tapSound, .5f);
             _slot.isOccupied = true;
             IsMovingStraight = true;
             isMovingForward = true;
@@ -119,7 +121,7 @@ namespace _CasualBusJam.Scripts._Vehicle
             
             Debug.DrawLine(transform.position, worldPoint, Color.green);
             movingZdir = transform.DOMove(worldPoint, 12f).SetSpeedBased();
-            //GetComponent<AudioSource>().enabled = true;
+            GetComponent<AudioSource>().enabled = true;
         }
 
         private void ChangeScale(bool shift)
@@ -171,8 +173,8 @@ namespace _CasualBusJam.Scripts._Vehicle
                     if (IsMovingStraight && _counter == 0 && isMovingForward)
                     {
                         _counter++;
-                        //GetComponent<AudioSource>().enabled = false;
-                        //
+                        GetComponent<AudioSource>().enabled = false;
+                        SoundController.Instance.PlayOneShot(SoundController.Instance.hitSound);
                         EffectsManager.Instance.PlayEffect(EffectsManager.Instance.hitEffect,
                             other.ClosestPoint(transform.position + new Vector3(0, 0.25f, 0)), Quaternion.identity);
                     }
@@ -282,7 +284,7 @@ namespace _CasualBusJam.Scripts._Vehicle
                 Debug.Log("Moved to Slot");
                 if (!PlayerController.Instance.isColorMatched)
                     EventManager.OnNewVehArrived?.Invoke();
-                //sounds
+                GetComponent<AudioSource>().enabled = false;
             });
 
         }
@@ -294,6 +296,7 @@ namespace _CasualBusJam.Scripts._Vehicle
                 if (seats[i].childCount == 0)
                 {
                     playersInSeat++;
+                    IsVehicleFull();
                     return seats[i];
                 }
             }
@@ -308,10 +311,33 @@ namespace _CasualBusJam.Scripts._Vehicle
                 isFull = true;
                 DOVirtual.DelayedCall(1f, () =>
                 {
-                    //VehicleGoing();
+                    VehicleGoingToExit();
                     //GameManager.instance.CheckGameWin();
                 });
             }
+        }
+
+        private void VehicleGoingToExit()
+        {
+            VehicleController.Instance.vehicles = VehicleController.Instance.vehicles
+                .Where(v => v != this)
+                .ToArray();
+            
+            transform.DORotateQuaternion(ParkingManager.Instance.exitPoint.rotation, 0.2f);
+            transform.DOMove(
+                new Vector3(_slot.enterPoint.transform.position.x, transform.position.y,
+                    _slot.enterPoint.transform.position.z), 30f).SetSpeedBased().OnComplete(() =>
+            {
+                _slot.isOccupied = false;
+                _canCollideWithOtherVehicle = false;
+                ParkingManager.Instance.parkedVehicles.Remove(this);
+                transform.parent = null;
+                transform.DOMove(ParkingManager.Instance.exitPoint.transform.position, 35f).SetSpeedBased().SetEase(Ease.InBack)
+                    .OnComplete(() => { transform.gameObject.SetActive(false); });
+            });
+            
+            SoundController.Instance.PlayFullSound();
+            SoundController.Instance.PlayOneShot(SoundController.Instance.moving);
         }
     }
 }

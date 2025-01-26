@@ -4,6 +4,7 @@ using System.Linq;
 using _CasualBusJam.Scripts._Data;
 using _CasualBusJam.Scripts._Enum;
 using _CasualBusJam.Scripts._Player;
+using TMPro;
 using Unity.VisualScripting;
 using UnityEngine;
 
@@ -16,10 +17,12 @@ namespace _CasualBusJam.Scripts._Vehicle
         public MaterialHolder vehicleMaterialHolder;
         public Transform road;
         public Transform leftCollider;
-        public Transform rightCollider;
         
-        [Header("----- Vehicle Settings ------")]
-        public int totalPlayersCount;
+        [Header("----- Count Settings ------")]
+        [SerializeField] private TextMeshPro countText;
+        private int _totalPlayersCount;
+        private int _playerCount;
+        
         
         
         public static VehicleController Instance;
@@ -34,13 +37,21 @@ namespace _CasualBusJam.Scripts._Vehicle
         private void Start()
         {
             CalculatePlayersCount();
+            _playerCount = _totalPlayersCount;
+            countText.text = _playerCount.ToString();
+        }
+
+        public void UpdatePlayerCount()
+        {
+            _playerCount--;
+            countText.text = _playerCount.ToString();
         }
 
         private void CalculatePlayersCount()
         {
             foreach (var vehicle in vehicles)
             {
-                totalPlayersCount += vehicle.SeatCount;
+                _totalPlayersCount += vehicle.SeatCount;
             }
             
             PlayerController.Instance.InstantiatePlayer(vehicles);
@@ -66,6 +77,9 @@ namespace _CasualBusJam.Scripts._Vehicle
                 }
             }
         }
+        
+        
+        
         
     }
 }
